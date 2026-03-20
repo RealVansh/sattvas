@@ -14,6 +14,7 @@ function App() {
   const [isJoinMode, setIsJoinMode] = useState(Boolean(urlRoomId));
   const [localPinnedId, setLocalPinnedId] = useState(null);
   const [expandedAdminUser, setExpandedAdminUser] = useState(null);
+  const [showParticipants, setShowParticipants] = useState(false);
   const shareMessageTimerRef = useRef(null);
 
   const {
@@ -232,14 +233,19 @@ function App() {
 
       <header className={`room-header floating-header ${controlsVisible ? 'is-visible' : 'is-hidden'}`}>
         <div>
-          <h1>Room: {roomId}</h1>
+          <h1>Class: {roomId}</h1>
           <p>
             {participantCount} participants • {isHost ? 'Host' : 'Participant'}
           </p>
         </div>
+        {isHost && (
+          <button type="button" onClick={shareRoom} className="header-share-btn">
+            🔗 Share Invite
+          </button>
+        )}
       </header>
 
-      {isHost ? (
+      {isHost && showParticipants ? (
         <aside className={`admin-panel ${controlsVisible ? 'is-visible' : 'is-hidden'}`}>
           <h2>Host Controls</h2>
           <p className="admin-subtitle">You can moderate participants and start 1:1 whisper mode.</p>
@@ -320,26 +326,28 @@ function App() {
         className={`controls floating-controls ${controlsVisible ? 'is-visible' : 'is-hidden'}`}
         aria-label="Media controls"
       >
-        <button type="button" onClick={toggleAudio}>
-          {isAudioEnabled ? 'Mute' : 'Unmute'}
+        <button type="button" onClick={toggleAudio} title={isAudioEnabled ? "Mute Microphone" : "Unmute Microphone"} className="icon-btn">
+          {isAudioEnabled ? '🎙️' : '🔇'}
         </button>
-        <button type="button" onClick={toggleVideo}>
-          {isVideoEnabled ? 'Camera Off' : 'Camera On'}
+        <button type="button" onClick={toggleVideo} title={isVideoEnabled ? "Turn off Camera" : "Turn on Camera"} className="icon-btn">
+          {isVideoEnabled ? '📹' : '📵'}
         </button>
-        <button type="button" onClick={shareRoom}>
-          Share
-        </button>
+        {isHost && (
+          <button type="button" onClick={() => setShowParticipants(s => !s)} title="Host Controls & Participants" className="icon-btn">
+            👥
+          </button>
+        )}
         {isHost && privateAudioTarget ? (
-          <button type="button" onClick={() => {
+          <button type="button" className="icon-btn active-whisper-btn" onClick={() => {
             const target = privateAudioTarget;
             setPrivateAudioTarget('');
             sendAdminCommand(target, 'set-whisper', null);
-          }}>
-            End Whisper
+          }} title="End Whisper Session">
+            🤫
           </button>
         ) : null}
-        <button type="button" className="danger" onClick={leaveRoom}>
-          Leave
+        <button type="button" className="danger icon-btn" onClick={leaveRoom} title="Leave Class">
+          ☎️
         </button>
       </section>
 
