@@ -6,7 +6,7 @@ const SIGNALING_SERVER_URL =
   (window.location.hostname === 'localhost' ? 'http://localhost:4000' : window.location.origin);
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 
-function useRoomCall(roomId) {
+function useRoomCall(roomId, userName) {
   const [localStream, setLocalStream] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
@@ -16,6 +16,7 @@ function useRoomCall(roomId) {
   const [hostId, setHostId] = useState('');
   const [adminNotice, setAdminNotice] = useState('');
   const [privateAudioTarget, setPrivateAudioTargetState] = useState('');
+  const [globalPinnedId, setGlobalPinnedId] = useState(null);
 
   const socketRef = useRef(null);
   const localStreamRef = useRef(null);
@@ -24,6 +25,7 @@ function useRoomCall(roomId) {
   const privateAudioTargetRef = useRef('');
   const adminNoticeTimerRef = useRef(null);
   const silentTrackRef = useRef(null);
+  const peerNamesRef = useRef(new Map());
 
   const getSilentTrack = useCallback(() => {
     if (!silentTrackRef.current) {
@@ -92,6 +94,25 @@ function useRoomCall(roomId) {
     [isHost]
   );
 
+  const sendAdminBroadcast = useCallback(
+    (type, value) => {
+      if (!isHost || !type) {
+        return;
+      }
+
+      const socket = socketRef.current;
+      if (!socket) {
+        return;
+      }
+
+      socket.emit('admin-broadcast', {
+        type,
+        value
+      });
+    },
+    [isHost]
+  );
+
   useEffect(() => {
     if (!roomId) {
       setParticipants([]);
@@ -101,7 +122,9 @@ function useRoomCall(roomId) {
       setHostId('');
       setAdminNotice('');
       setPrivateAudioTargetState('');
+      setGlobalPinnedId(null);
       privateAudioTargetRef.current = '';
+      peerNamesRef.current.clear();
       return undefined;
     }
 
@@ -110,14 +133,15 @@ function useRoomCall(roomId) {
     const audioSenders = audioSendersRef.current;
 
     const addOrUpdateParticipant = (id, stream) => {
+      const name = peerNamesRef.current.get(id) || id.slice(0, 6);
       setParticipants((prev) => {
         const index = prev.findIndex((participant) => participant.id === id);
         if (index === -1) {
-          return [...prev, { id, stream }];
+          return [...prev, { id, name, stream }];
         }
 
         const next = [...prev];
-        next[index] = { id, stream };
+        next[index] = { id, name, stream };
         return next;
       });
     };
@@ -135,6 +159,7 @@ function useRoomCall(roomId) {
       }
       peerConnectionsRef.current.delete(peerId);
       audioSendersRef.current.delete(peerId);
+      peerNamesRef.current.delete(peerId);
     };
 
     const createPeerConnection = (peerId, socket) => {
@@ -220,7 +245,7 @@ function useRoomCall(roomId) {
         socketRef.current = socket;
 
         socket.on('connect', () => {
-          socket.emit('join-room', { roomId });
+          socket.emit('join-room', { roomId, userName });
         });
 
         socket.on('room-full', () => {
@@ -231,12 +256,20 @@ function useRoomCall(roomId) {
           setError(payload?.message || 'Unable to join room.');
         });
 
-        socket.on('existing-users', async ({ users, hostId: nextHostId, selfId: socketSelfId }) => {
+        socket.on('existing-users', async ({ users, hostId: nextHostId, selfId: socketSelfId, pinnedSpeakerId }) => {
           setHostId(nextHostId || '');
           setSelfId(socketSelfId || socket.id);
+          
+          if (pinnedSpeakerId) {
+            setGlobalPinnedId(pinnedSpeakerId);
+          }
 
-          for (const peerId of users) {
-            await createOfferToPeer(peerId, socket);
+          for (const peer of users) {
+             peerNamesRef.current.set(peer.id, peer.name);
+          }
+
+          for (const peer of users) {
+            await createOfferToPeer(peer.id, socket);
           }
         });
 
@@ -277,6 +310,10 @@ function useRoomCall(roomId) {
           } catch (iceError) {
             console.error('Error adding ICE candidate:', iceError);
           }
+        });
+
+        socket.on('user-joined', ({ socketId, name, hostId }) => {
+          peerNamesRef.current.set(socketId, name);
         });
 
         socket.on('user-left', ({ socketId }) => {
@@ -322,6 +359,12 @@ function useRoomCall(roomId) {
             setAdminNotice('');
           }, 2200);
         });
+
+        socket.on('admin-broadcast', ({ type, value }) => {
+          if (type === 'set-pinned') {
+            setGlobalPinnedId(value);
+          }
+        });
       } catch (mediaError) {
         console.error('Error starting local media:', mediaError);
         setError('Unable to access camera/microphone. Check browser permissions.');
@@ -348,6 +391,7 @@ function useRoomCall(roomId) {
       });
       peerConnections.clear();
       audioSenders.clear();
+      peerNamesRef.current.clear();
 
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((track) => track.stop());
@@ -365,9 +409,10 @@ function useRoomCall(roomId) {
       setHostId('');
       setAdminNotice('');
       setPrivateAudioTargetState('');
+      setGlobalPinnedId(null);
       privateAudioTargetRef.current = '';
     };
-  }, [roomId, routePrivateAudio, setPrivateAudioTarget]);
+  }, [roomId, userName, routePrivateAudio, setPrivateAudioTarget]);
 
   const toggleAudio = () => {
     const stream = localStreamRef.current;
@@ -409,9 +454,11 @@ function useRoomCall(roomId) {
     isHost,
     adminNotice,
     privateAudioTarget,
+    globalPinnedId,
     toggleAudio,
     toggleVideo,
     sendAdminCommand,
+    sendAdminBroadcast,
     setPrivateAudioTarget,
     error
   };

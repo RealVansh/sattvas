@@ -37,6 +37,10 @@ const rooms = new Map();
 const roomHosts = new Map();
 // Maps socket id -> roomId for disconnect cleanup.
 const socketToRoom = new Map();
+// Maps socket id -> user name provided on join.
+const userNames = new Map();
+// Maps roomId -> socket id of currently pinned speaker.
+const roomPinnedSpeaker = new Map();
 
 function getRoomUsers(roomId) {
   const users = rooms.get(roomId);
@@ -66,11 +70,13 @@ function removeUserFromRoom(roomId, socketId) {
 }
 
 io.on('connection', (socket) => {
-  socket.on('join-room', ({ roomId }) => {
+  socket.on('join-room', ({ roomId, userName }) => {
     if (!roomId || typeof roomId !== 'string') {
       socket.emit('room-error', { message: 'Invalid room id.' });
       return;
     }
+
+    userNames.set(socket.id, userName || 'Participant');
 
     const currentUsers = getRoomUsers(roomId);
     if (currentUsers.length >= ROOM_SIZE_LIMIT) {
@@ -86,18 +92,24 @@ io.on('connection', (socket) => {
     socketToRoom.set(socket.id, roomId);
     socket.join(roomId);
 
-    const existingUsers = currentUsers.filter((userId) => userId !== socket.id);
+    const existingUsers = currentUsers.filter((userId) => userId !== socket.id).map(id => ({
+      id,
+      name: userNames.get(id) || 'Participant'
+    }));
+    
     const hostId = roomHosts.get(roomId);
     socket.emit('existing-users', {
       roomId,
       users: existingUsers,
       hostId,
-      selfId: socket.id
+      selfId: socket.id,
+      pinnedSpeakerId: roomPinnedSpeaker.get(roomId) || null
     });
 
     socket.to(roomId).emit('user-joined', {
       roomId,
       socketId: socket.id,
+      name: userNames.get(socket.id),
       hostId
     });
   });
@@ -119,6 +131,28 @@ io.on('connection', (socket) => {
     }
 
     io.to(target).emit('admin-command', {
+      from: socket.id,
+      type,
+      value
+    });
+  });
+
+  socket.on('admin-broadcast', ({ type, value }) => {
+    const roomId = socketToRoom.get(socket.id);
+    if (!roomId || !type) return;
+    
+    const hostId = roomHosts.get(roomId);
+    if (hostId !== socket.id) return;
+
+    if (type === 'set-pinned') {
+      if (value) {
+        roomPinnedSpeaker.set(roomId, value);
+      } else {
+        roomPinnedSpeaker.delete(roomId);
+      }
+    }
+
+    io.to(roomId).emit('admin-broadcast', {
       from: socket.id,
       type,
       value
@@ -182,10 +216,17 @@ io.on('connection', (socket) => {
       });
     }
 
+    if (roomPinnedSpeaker.get(roomId) === socket.id) {
+      roomPinnedSpeaker.delete(roomId);
+      io.to(roomId).emit('admin-broadcast', { from: 'server', type: 'set-pinned', value: null });
+    }
+
     socket.to(roomId).emit('user-left', {
       roomId,
       socketId: socket.id
     });
+    
+    userNames.delete(socket.id);
   };
 
   socket.on('leave-room', handleUserExit);

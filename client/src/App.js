@@ -5,11 +5,13 @@ import { createRoomId, getRoomIdFromPath, navigateToRoom } from './utils/room';
 import useRoomCall from './hooks/useRoomCall';
 
 function App() {
-  const [roomInput, setRoomInput] = useState('');
-  const [roomId, setRoomId] = useState(() => getRoomIdFromPath(window.location.pathname));
+  const urlRoomId = useMemo(() => getRoomIdFromPath(window.location.pathname), []);
+  const [roomInput, setRoomInput] = useState(urlRoomId || '');
+  const [userName, setUserName] = useState(() => localStorage.getItem('userName') || '');
+  const [roomId, setRoomId] = useState('');
   const [controlsVisible, setControlsVisible] = useState(true);
   const [shareMessage, setShareMessage] = useState('');
-  const hideControlsTimerRef = useRef(null);
+  const [isJoinMode, setIsJoinMode] = useState(Boolean(urlRoomId));
   const shareMessageTimerRef = useRef(null);
 
   const {
@@ -21,27 +23,17 @@ function App() {
     selfId,
     adminNotice,
     privateAudioTarget,
+    globalPinnedId,
     toggleAudio,
     toggleVideo,
     sendAdminCommand,
+    sendAdminBroadcast,
     setPrivateAudioTarget,
     error
-  } = useRoomCall(roomId);
+  } = useRoomCall(roomId, userName);
 
   const participantCount = useMemo(() => participants.length + (localStream ? 1 : 0), [participants, localStream]);
   const roomUrl = useMemo(() => `${window.location.origin}/room/${roomId}`, [roomId]);
-
-  const resetControlsTimer = () => {
-    setControlsVisible(true);
-
-    if (hideControlsTimerRef.current) {
-      clearTimeout(hideControlsTimerRef.current);
-    }
-
-    hideControlsTimerRef.current = setTimeout(() => {
-      setControlsVisible(false);
-    }, 3500);
-  };
 
   useEffect(() => {
     if (!roomId) {
@@ -49,13 +41,7 @@ function App() {
       return undefined;
     }
 
-    resetControlsTimer();
-
     return () => {
-      if (hideControlsTimerRef.current) {
-        clearTimeout(hideControlsTimerRef.current);
-      }
-
       if (shareMessageTimerRef.current) {
         clearTimeout(shareMessageTimerRef.current);
       }
@@ -78,8 +64,7 @@ function App() {
     try {
       if (navigator.share) {
         await navigator.share({
-          title: 'Join my video call',
-          text: 'Join my room:',
+          title: "Sattva's Synergy Class",
           url: roomUrl
         });
         setTemporaryShareMessage('Room link shared.');
@@ -100,7 +85,14 @@ function App() {
     }
   };
 
+  const handleNameChange = (e) => {
+    const val = e.target.value;
+    setUserName(val);
+    localStorage.setItem('userName', val);
+  };
+
   const handleCreateRoom = () => {
+    if (!userName.trim()) return;
     const newRoomId = createRoomId();
     navigateToRoom(newRoomId);
     setRoomId(newRoomId);
@@ -111,7 +103,7 @@ function App() {
     event.preventDefault();
     const trimmed = roomInput.trim();
 
-    if (!trimmed) {
+    if (!trimmed || !userName.trim()) {
       return;
     }
 
@@ -130,44 +122,93 @@ function App() {
     return (
       <main className="lobby">
         <div className="lobby-card">
-          <h1>Sattva's Synergy</h1>
-          <p>Create a room or join one by room ID.</p>
+          <img src="/logo.png" alt="Sattva Yoga Logo" className="lobby-logo" onError={(e) => e.target.style.display = 'none'} />
+          <p className="subtitle">Sattva's Synergy</p>
 
-          <div className="lobby-actions">
-            <button type="button" onClick={handleCreateRoom}>
-              Create Room
-            </button>
+          <div className="input-group">
+            <label htmlFor="userName">Your Name</label>
+            <input
+              id="userName"
+              type="text"
+              value={userName}
+              onChange={handleNameChange}
+              placeholder="Enter your name to join"
+              required
+            />
           </div>
 
-          <form className="join-form" onSubmit={handleJoinRoom}>
-            <input
-              type="text"
-              value={roomInput}
-              onChange={(event) => setRoomInput(event.target.value)}
-              placeholder="Enter room id"
-              aria-label="Room ID"
-            />
-            <button type="submit">Join Room</button>
-          </form>
+          {!isJoinMode ? (
+            <div className="lobby-actions vertical-actions">
+              <button type="button" onClick={handleCreateRoom} disabled={!userName.trim()}>
+                Start a New Class
+              </button>
+              <button type="button" className="secondary-button" onClick={() => setIsJoinMode(true)}>
+                Join Existing Class
+              </button>
+            </div>
+          ) : (
+            <form className="join-form" onSubmit={handleJoinRoom}>
+              <div className="input-group">
+                <label htmlFor="roomId">Class ID / Link</label>
+                <input
+                  id="roomId"
+                  type="text"
+                  value={roomInput}
+                  onChange={(event) => setRoomInput(event.target.value)}
+                  placeholder="Enter Class ID"
+                  required
+                />
+              </div>
+              <div className="lobby-actions vertical-actions">
+                <button type="submit" disabled={!userName.trim() || !roomInput.trim()}>
+                  Enter Class
+                </button>
+                {!urlRoomId && (
+                  <button type="button" className="secondary-button" onClick={() => setIsJoinMode(false)}>
+                    Back
+                  </button>
+                )}
+              </div>
+            </form>
+          )}
         </div>
       </main>
     );
   }
 
+  const handleBackgroundTap = (e) => {
+    // Only toggle if they click the background/grid directly, not the buttons
+    if (e.target.tagName !== 'BUTTON' && !e.target.closest('.admin-panel')) {
+      setControlsVisible((v) => !v);
+    }
+  };
+
+  const allParticipants = [
+    localStream ? { id: selfId, name: 'You', stream: localStream, isLocal: true } : null,
+    ...participants
+  ].filter(Boolean);
+
+  const pinnedUser = globalPinnedId ? allParticipants.find(p => p.id === globalPinnedId) : null;
+  const unpinnedUsers = globalPinnedId ? allParticipants.filter(p => p.id !== globalPinnedId) : allParticipants;
+
   return (
     <main
       className="room-page immersive"
-      onPointerDown={resetControlsTimer}
-      onPointerMove={resetControlsTimer}
-      onKeyDown={resetControlsTimer}
+      onClick={handleBackgroundTap}
       role="presentation"
     >
-      <section className="video-grid fullscreen-grid">
-        {localStream ? <VideoTile stream={localStream} label="You" muted /> : null}
+      <section className={`video-grid ${globalPinnedId ? 'has-spotlight' : 'fullscreen-grid'}`}>
+        {globalPinnedId && pinnedUser ? (
+          <div className="spotlight-main">
+            <VideoTile stream={pinnedUser.stream} label={pinnedUser.name} muted={pinnedUser.isLocal} />
+          </div>
+        ) : null}
 
-        {participants.map((participant) => (
-          <VideoTile key={participant.id} stream={participant.stream} label={participant.id.slice(0, 6)} />
-        ))}
+        <div className={globalPinnedId ? 'spotlight-strip' : 'grid-inner'}>
+          {unpinnedUsers.map((p) => (
+            <VideoTile key={p.id} stream={p.stream} label={p.name} muted={p.isLocal} />
+          ))}
+        </div>
       </section>
 
       {error ? <p className="error floating-error">{error}</p> : null}
@@ -191,10 +232,11 @@ function App() {
 
           {participants.map((participant) => {
             const isWhisperTarget = privateAudioTarget === participant.id;
+            const isTargetPinned = globalPinnedId === participant.id;
 
             return (
               <div className="admin-row" key={participant.id}>
-                <span>{participant.id.slice(0, 6)}</span>
+                <span>{participant.name || participant.id.slice(0, 6)}</span>
 
                 <div className="admin-row-actions">
                   <button
@@ -233,6 +275,13 @@ function App() {
                     }}
                   >
                     {isWhisperTarget ? 'Stop Whisper' : 'Whisper'}
+                  </button>
+                  <button
+                    type="button"
+                    className={isTargetPinned ? 'active-pin' : ''}
+                    onClick={() => sendAdminBroadcast('set-pinned', isTargetPinned ? null : participant.id)}
+                  >
+                    {isTargetPinned ? 'Unpin' : 'Spotlight'}
                   </button>
                 </div>
               </div>
