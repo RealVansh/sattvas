@@ -414,34 +414,74 @@ function useRoomCall(roomId, userName) {
     };
   }, [roomId, userName, routePrivateAudio, setPrivateAudioTarget]);
 
-  const toggleAudio = () => {
+  const toggleAudio = async () => {
     const stream = localStreamRef.current;
     if (!stream) {
       return;
     }
 
-    const enabled = !isAudioEnabled;
-    stream.getAudioTracks().forEach((track) => {
-      track.enabled = enabled;
-    });
-    setIsAudioEnabled(enabled);
-
-    if (enabled) {
-      routePrivateAudio(privateAudioTargetRef.current);
+    if (isAudioEnabled) {
+      stream.getAudioTracks().forEach((track) => {
+        track.enabled = false;
+        track.stop();
+        stream.removeTrack(track);
+      });
+      setIsAudioEnabled(false);
+      setLocalStream(new MediaStream(stream.getTracks()));
+    } else {
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const newTrack = newStream.getAudioTracks()[0];
+        stream.addTrack(newTrack);
+        
+        // Re-run whisper routing, which gracefully handles assigning the new real track 
+        // to public senders and a silent track to non-whisper targets.
+        await routePrivateAudio(privateAudioTargetRef.current);
+        
+        setIsAudioEnabled(true);
+        setLocalStream(new MediaStream(stream.getTracks()));
+      } catch (err) {
+        console.error('Failed to restart mic', err);
+        setError('Failed to restart microphone. Check permissions.');
+      }
     }
   };
 
-  const toggleVideo = () => {
+  const toggleVideo = async () => {
     const stream = localStreamRef.current;
     if (!stream) {
       return;
     }
 
-    const enabled = !isVideoEnabled;
-    stream.getVideoTracks().forEach((track) => {
-      track.enabled = enabled;
-    });
-    setIsVideoEnabled(enabled);
+    if (isVideoEnabled) {
+      stream.getVideoTracks().forEach((track) => {
+        track.enabled = false;
+        track.stop();
+        stream.removeTrack(track);
+      });
+      setIsVideoEnabled(false);
+      setLocalStream(new MediaStream(stream.getTracks()));
+    } else {
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const newTrack = newStream.getVideoTracks()[0];
+        stream.addTrack(newTrack);
+        
+        peerConnectionsRef.current.forEach((peerConnection) => {
+          const transceivers = peerConnection.getTransceivers();
+          const videoTransceiver = transceivers.find((t) => t.receiver && t.receiver.track && t.receiver.track.kind === 'video');
+          if (videoTransceiver && videoTransceiver.sender) {
+            videoTransceiver.sender.replaceTrack(newTrack);
+          }
+        });
+        
+        setIsVideoEnabled(true);
+        setLocalStream(new MediaStream(stream.getTracks()));
+      } catch (err) {
+        console.error('Failed to restart camera', err);
+        setError('Failed to restart camera. Check permissions.');
+      }
+    }
   };
 
   return {

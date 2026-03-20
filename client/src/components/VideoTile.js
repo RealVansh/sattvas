@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-function VideoTile({ stream, label, muted = false, isPinned = false, onPin = null }) {
+function VideoTile({ stream, label, muted = false, isLocal = false, isPinned = false, onPin = null }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -11,7 +11,7 @@ function VideoTile({ stream, label, muted = false, isPinned = false, onPin = nul
 
   return (
     <article className={`video-tile ${isPinned ? 'is-pinned' : ''}`}>
-      <video ref={videoRef} autoPlay playsInline muted={muted} />
+      <video className={isLocal ? 'mirrored' : ''} ref={videoRef} autoPlay playsInline muted={muted} />
       <div className="video-overlay">
         <p>{label}</p>
         {onPin && (

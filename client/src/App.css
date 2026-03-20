@@ -177,6 +177,10 @@ button {
   display: block;
 }
 
+.video-tile video.mirrored {
+  transform: scaleX(-1);
+}
+
 .video-overlay {
   position: absolute;
   top: 0;

@@ -208,6 +208,7 @@ function App() {
               stream={pinnedUser.stream} 
               label={pinnedUser.name} 
               muted={pinnedUser.isLocal} 
+              isLocal={pinnedUser.isLocal}
               isPinned={true}
               onPin={isHost ? () => sendAdminBroadcast('set-pinned', null) : undefined}
             />
@@ -221,6 +222,7 @@ function App() {
               stream={p.stream} 
               label={p.name} 
               muted={p.isLocal} 
+              isLocal={p.isLocal}
               isPinned={false}
               onPin={isHost ? () => sendAdminBroadcast('set-pinned', p.id) : undefined}
             />
