@@ -167,6 +167,7 @@ button {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  position: relative;
 }
 
 .video-tile video {
@@ -176,11 +177,55 @@ button {
   display: block;
 }
 
-.video-tile p {
+.video-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 10px;
+}
+
+.video-overlay p {
+  align-self: flex-start;
   margin: 0;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.46);
+  backdrop-filter: blur(4px);
   color: #fff;
-  padding: 8px 10px;
   font-size: 13px;
+}
+
+.pin-button {
+  align-self: flex-end;
+  pointer-events: auto;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.2s ease, background 0.2s ease;
+}
+
+.video-tile:hover .pin-button,
+.pin-button.active-pin-btn {
+  opacity: 1;
+}
+
+.pin-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.pin-button.active-pin-btn {
+  background: var(--accent);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 .immersive {
@@ -255,16 +300,6 @@ button {
   height: 100%;
   width: 100%;
   object-fit: cover;
-}
-
-.fullscreen-grid .video-tile p {
-  position: absolute;
-  left: 10px;
-  bottom: 10px;
-  padding: 5px 9px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.46);
-  backdrop-filter: blur(4px);
 }
 
 .floating-header {
@@ -407,22 +442,39 @@ button {
 }
 
 .admin-row {
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
-  padding-top: 9px;
-  margin-top: 9px;
+  margin-top: 4px;
 }
 
-.admin-row span {
-  display: block;
-  margin-bottom: 7px;
-  font-size: 12px;
+.admin-row-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 13px;
   font-weight: 600;
+  text-align: left;
+  margin-top: 8px;
+}
+
+.admin-row-header:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.expand-icon {
+  font-size: 10px;
+  opacity: 0.7;
 }
 
 .admin-row-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  padding: 10px 4px 4px;
 }
 
 .admin-row-actions button {

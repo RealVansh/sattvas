@@ -12,6 +12,8 @@ function App() {
   const [controlsVisible, setControlsVisible] = useState(true);
   const [shareMessage, setShareMessage] = useState('');
   const [isJoinMode, setIsJoinMode] = useState(Boolean(urlRoomId));
+  const [localPinnedId, setLocalPinnedId] = useState(null);
+  const [expandedAdminUser, setExpandedAdminUser] = useState(null);
   const shareMessageTimerRef = useRef(null);
 
   const {
@@ -188,8 +190,9 @@ function App() {
     ...participants
   ].filter(Boolean);
 
-  const pinnedUser = globalPinnedId ? allParticipants.find(p => p.id === globalPinnedId) : null;
-  const unpinnedUsers = globalPinnedId ? allParticipants.filter(p => p.id !== globalPinnedId) : allParticipants;
+  const activePinId = globalPinnedId;
+  const pinnedUser = activePinId ? allParticipants.find(p => p.id === activePinId) : null;
+  const unpinnedUsers = activePinId ? allParticipants.filter(p => p.id !== activePinId) : allParticipants;
 
   return (
     <main
@@ -197,16 +200,29 @@ function App() {
       onClick={handleBackgroundTap}
       role="presentation"
     >
-      <section className={`video-grid ${globalPinnedId ? 'has-spotlight' : 'fullscreen-grid'}`}>
-        {globalPinnedId && pinnedUser ? (
+      <section className={`video-grid ${activePinId ? 'has-spotlight' : 'fullscreen-grid'}`}>
+        {activePinId && pinnedUser ? (
           <div className="spotlight-main">
-            <VideoTile stream={pinnedUser.stream} label={pinnedUser.name} muted={pinnedUser.isLocal} />
+            <VideoTile 
+              stream={pinnedUser.stream} 
+              label={pinnedUser.name} 
+              muted={pinnedUser.isLocal} 
+              isPinned={true}
+              onPin={isHost ? () => sendAdminBroadcast('set-pinned', null) : undefined}
+            />
           </div>
         ) : null}
 
-        <div className={globalPinnedId ? 'spotlight-strip' : 'grid-inner'}>
+        <div className={activePinId ? 'spotlight-strip' : 'grid-inner'}>
           {unpinnedUsers.map((p) => (
-            <VideoTile key={p.id} stream={p.stream} label={p.name} muted={p.isLocal} />
+            <VideoTile 
+              key={p.id} 
+              stream={p.stream} 
+              label={p.name} 
+              muted={p.isLocal} 
+              isPinned={false}
+              onPin={isHost ? () => sendAdminBroadcast('set-pinned', p.id) : undefined}
+            />
           ))}
         </div>
       </section>
@@ -236,54 +252,64 @@ function App() {
 
             return (
               <div className="admin-row" key={participant.id}>
-                <span>{participant.name || participant.id.slice(0, 6)}</span>
+                <button 
+                  type="button"
+                  className="admin-row-header"
+                  onClick={() => setExpandedAdminUser(prev => prev === participant.id ? null : participant.id)}
+                >
+                  <span>{participant.name || participant.id.slice(0, 6)}</span>
+                  <span className="expand-icon">{expandedAdminUser === participant.id ? '▼' : '▶'}</span>
+                </button>
 
-                <div className="admin-row-actions">
-                  <button
-                    type="button"
-                    onClick={() => sendAdminCommand(participant.id, 'set-audio-enabled', false)}
-                  >
-                    Mute
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => sendAdminCommand(participant.id, 'set-audio-enabled', true)}
-                  >
-                    Unmute
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => sendAdminCommand(participant.id, 'set-video-enabled', false)}
-                  >
-                    Cam Off
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => sendAdminCommand(participant.id, 'set-video-enabled', true)}
-                  >
-                    Cam On
-                  </button>
-                  <button
-                    type="button"
-                    className={isWhisperTarget ? 'active-whisper' : ''}
-                    onClick={() => {
-                      if (!isWhisperTarget && privateAudioTarget) {
-                        sendAdminCommand(privateAudioTarget, 'set-whisper', null);
-                      }
-                      setPrivateAudioTarget(isWhisperTarget ? '' : participant.id);
-                      sendAdminCommand(participant.id, 'set-whisper', isWhisperTarget ? null : selfId);
-                    }}
-                  >
-                    {isWhisperTarget ? 'Stop Whisper' : 'Whisper'}
-                  </button>
-                  <button
-                    type="button"
-                    className={isTargetPinned ? 'active-pin' : ''}
-                    onClick={() => sendAdminBroadcast('set-pinned', isTargetPinned ? null : participant.id)}
-                  >
-                    {isTargetPinned ? 'Unpin' : 'Spotlight'}
-                  </button>
-                </div>
+                {expandedAdminUser === participant.id && (
+                  <div className="admin-row-actions">
+                    <button
+                      type="button"
+                      onClick={() => sendAdminCommand(participant.id, 'set-audio-enabled', false)}
+                    >
+                      Mute
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => sendAdminCommand(participant.id, 'set-audio-enabled', true)}
+                    >
+                      Unmute
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => sendAdminCommand(participant.id, 'set-video-enabled', false)}
+                    >
+                      Cam Off
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => sendAdminCommand(participant.id, 'set-video-enabled', true)}
+                    >
+                      Cam On
+                    </button>
+                    <button
+                      type="button"
+                      className={isWhisperTarget ? 'active-whisper' : ''}
+                      onClick={() => {
+                        if (!isWhisperTarget && privateAudioTarget) {
+                          sendAdminCommand(privateAudioTarget, 'set-whisper', null);
+                        }
+                        setPrivateAudioTarget(isWhisperTarget ? '' : participant.id);
+                        sendAdminCommand(participant.id, 'set-whisper', isWhisperTarget ? null : selfId);
+                      }}
+                    >
+                      {isWhisperTarget ? 'Stop Whisper' : 'Whisper'}
+                    </button>
+                    <button
+                      type="button"
+                      className={isTargetPinned ? 'active-pin' : ''}
+                      onClick={() => sendAdminBroadcast('set-pinned', isTargetPinned ? null : participant.id)}
+                      title="Spotlight for Everyone"
+                    >
+                      {isTargetPinned ? 'Unspotlight' : 'Spotlight'}
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
