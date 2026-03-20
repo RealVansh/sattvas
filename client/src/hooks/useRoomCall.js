@@ -3,7 +3,7 @@ import { io } from 'socket.io-client';
 
 const SIGNALING_SERVER_URL =
   process.env.REACT_APP_SIGNALING_URL ||
-  `${window.location.protocol}//${window.location.hostname}:4000`;
+  (window.location.hostname === 'localhost' ? 'http://localhost:4000' : window.location.origin);
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 
 function useRoomCall(roomId) {
