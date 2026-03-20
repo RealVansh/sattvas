@@ -4,4 +4,5 @@ client/build/
 .env
 .env.*
 *.log
-.DS_StoreSattva/
+.DS_Store
+Sattva/

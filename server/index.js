@@ -19,7 +19,7 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
 
-app.get('*', (req, res) => {
+app.use((req, res) => {
   res.sendFile(path.join(buildPath, 'index.html'));
 });
 
