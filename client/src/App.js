@@ -12,7 +12,6 @@ function App() {
   const [controlsVisible, setControlsVisible] = useState(true);
   const [shareMessage, setShareMessage] = useState('');
   const [isJoinMode, setIsJoinMode] = useState(Boolean(urlRoomId));
-  const [localPinnedId, setLocalPinnedId] = useState(null);
   const [expandedAdminUser, setExpandedAdminUser] = useState(null);
   const [showParticipants, setShowParticipants] = useState(false);
   const shareMessageTimerRef = useRef(null);
@@ -35,7 +34,6 @@ function App() {
     error
   } = useRoomCall(roomId, userName);
 
-  const participantCount = useMemo(() => participants.length + (localStream ? 1 : 0), [participants, localStream]);
   const roomUrl = useMemo(() => `${window.location.origin}/room/${roomId}`, [roomId]);
 
   useEffect(() => {
@@ -233,25 +231,8 @@ function App() {
       {error ? <p className="error floating-error">{error}</p> : null}
       {adminNotice ? <p className="admin-toast">{adminNotice}</p> : null}
 
-      <header className={`room-header floating-header ${controlsVisible ? 'is-visible' : 'is-hidden'}`}>
-        <div>
-          <h1>Class: {roomId}</h1>
-          <p>
-            {participantCount} participants • {isHost ? 'Host' : 'Participant'}
-          </p>
-        </div>
-        {isHost && (
-          <button type="button" onClick={shareRoom} className="header-share-btn">
-            🔗 Share Invite
-          </button>
-        )}
-      </header>
-
       {isHost && showParticipants ? (
         <aside className={`admin-panel ${controlsVisible ? 'is-visible' : 'is-hidden'}`}>
-          <h2>Host Controls</h2>
-          <p className="admin-subtitle">You can moderate participants and start 1:1 whisper mode.</p>
-
           {participants.length === 0 ? <p className="admin-empty">No participants yet.</p> : null}
 
           {participants.map((participant) => {
@@ -337,6 +318,11 @@ function App() {
         {isHost && (
           <button type="button" onClick={() => setShowParticipants(s => !s)} title="Host Controls & Participants" className="icon-btn">
             👥
+          </button>
+        )}
+        {isHost && (
+          <button type="button" onClick={shareRoom} title="Share Invite Link" className="icon-btn">
+            🔗
           </button>
         )}
         {isHost && privateAudioTarget ? (

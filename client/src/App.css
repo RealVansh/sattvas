@@ -448,13 +448,12 @@ button {
 
 .admin-panel {
   position: absolute;
-  right: 50%;
-  transform: translateX(50%);
-  bottom: 84px;
-  top: auto;
+  right: 16px;
+  top: 16px;
+  bottom: auto;
   z-index: 6;
-  width: min(380px, calc(100% - 32px));
-  max-height: calc(100vh - 120px);
+  width: min(360px, calc(100% - 32px));
+  max-height: calc(100vh - 96px);
   overflow: auto;
   padding: 12px;
   border-radius: 14px;
@@ -539,22 +538,27 @@ button {
 
   .floating-controls {
     bottom: 18px;
-    width: calc(100% - 20px);
+    width: auto;
+    max-width: calc(100% - 14px);
     border-radius: 18px;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: center;
     gap: 8px;
+    padding: 8px 10px;
+    overflow-x: auto;
   }
 
   .floating-controls button {
     min-width: 0;
+    flex: 0 0 auto;
   }
 
   .admin-panel {
-    right: 10px;
-    left: 10px;
-    width: auto;
-    top: 60px;
-    max-height: 42vh;
+    right: 8px;
+    left: auto;
+    width: min(300px, calc(100vw - 16px));
+    top: 8px;
+    max-height: calc(100vh - 92px);
   }
 }
