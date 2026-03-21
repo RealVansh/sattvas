@@ -190,8 +190,9 @@ function App() {
   ].filter(Boolean);
 
   const activePinId = globalPinnedId;
-  const pinnedUser = activePinId ? allParticipants.find(p => p.id === activePinId) : null;
-  const unpinnedUsers = activePinId ? allParticipants.filter(p => p.id !== activePinId) : allParticipants;
+  const displayPinId = activePinId === selfId ? null : activePinId;
+  const pinnedUser = displayPinId ? allParticipants.find(p => p.id === displayPinId) : null;
+  const unpinnedUsers = displayPinId ? allParticipants.filter(p => p.id !== displayPinId) : allParticipants;
 
   return (
     <main
@@ -199,21 +200,21 @@ function App() {
       onClick={handleBackgroundTap}
       role="presentation"
     >
-      <section className={`video-grid ${activePinId ? 'has-spotlight' : 'fullscreen-grid'}`}>
-        {activePinId && pinnedUser ? (
+      <section className={`video-grid ${displayPinId ? 'has-spotlight' : 'fullscreen-grid'}`}>
+        {displayPinId && pinnedUser ? (
           <div className="spotlight-main">
             <VideoTile 
               stream={pinnedUser.stream} 
               label={pinnedUser.name} 
               muted={pinnedUser.isLocal} 
               isLocal={pinnedUser.isLocal}
-              isPinned={true}
-              onPin={isHost ? () => sendAdminBroadcast('set-pinned', null) : undefined}
+              isPinned={activePinId === pinnedUser.id}
+              onPin={isHost ? () => sendAdminBroadcast('set-pinned', activePinId === pinnedUser.id ? null : pinnedUser.id) : undefined}
             />
           </div>
         ) : null}
 
-        <div className={activePinId ? 'spotlight-strip' : 'grid-inner'}>
+        <div className={displayPinId ? 'spotlight-strip' : 'grid-inner'}>
           {unpinnedUsers.map((p) => (
             <VideoTile 
               key={p.id} 
@@ -221,8 +222,8 @@ function App() {
               label={p.name} 
               muted={p.isLocal} 
               isLocal={p.isLocal}
-              isPinned={false}
-              onPin={isHost ? () => sendAdminBroadcast('set-pinned', p.id) : undefined}
+              isPinned={activePinId === p.id}
+              onPin={isHost ? () => sendAdminBroadcast('set-pinned', activePinId === p.id ? null : p.id) : undefined}
             />
           ))}
         </div>
